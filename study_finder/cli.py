@@ -27,16 +27,17 @@ from .extract import normalize
 from .storage import write_csv
 
 
-def _build_records(client: KonfoClient, koulutus_oids: list[str], languages, lng: str) -> list[dict]:
+def _build_records(client: KonfoClient, koulutus_oids: list[str], languages) -> list[dict]:
     records: list[dict] = []
     for oid in koulutus_oids:
-        koulutus = api.get_koulutus(client, oid, lng=lng)
-        t_oids = api.toteutus_oids(koulutus)
-        if not t_oids:
+        # One request per degree: ?toteutukset=true embeds the implementations,
+        # each with full metadata, so no per-toteutus calls are needed.
+        koulutus = api.get_koulutus(client, oid, with_toteutukset=True)
+        implementations = api.toteutukset(koulutus)
+        if not implementations:
             records.append(normalize(koulutus, None, languages))
             continue
-        for t_oid in t_oids:
-            toteutus = api.get_toteutus(client, t_oid, lng=lng)
+        for toteutus in implementations:
             records.append(normalize(koulutus, toteutus, languages))
     return records
 
@@ -92,7 +93,7 @@ def main(argv: list[str] | None = None) -> int:
         koulutus_oids = [h["oid"] for h in hits if h.get("oid")]
         print(f"ICT search matched {total} programmes; fetching {len(koulutus_oids)} (limit={args.limit}).")
 
-    records = _build_records(client, koulutus_oids, languages, primary_lang)
+    records = _build_records(client, koulutus_oids, languages)
 
     out_path = write_csv(records, Path(args.out))
     print(f"Wrote {len(records)} row(s) to {out_path}")

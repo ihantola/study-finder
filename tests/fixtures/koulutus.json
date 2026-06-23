@@ -1,7 +1,7 @@
 {
   "oid": "1.2.246.562.13.00000000000000002744",
   "koulutustyyppi": "yo",
-  "eqf": "7",
+  "eqf": [{"koodiUri": "eqf_7", "nimi": {"fi": "Taso 7", "sv": "Nivå 7", "en": "Level 7"}}],
   "nimi": {
     "fi": "Acoustics and Audio Technology, Master of Science (Technology) (2 yrs)",
     "en": "Acoustics and Audio Technology, Master of Science (Technology) (2 yrs)",
@@ -13,9 +13,31 @@
   "metadata": {
     "kuvaus": {"fi": "<p>Kuvaus suomeksi.</p>", "en": "<p>Description in English.</p>"},
     "osaamistavoitteet": {"fi": "<p>Yleiset osaamistavoitteet.</p>"},
-    "tutkintonimike": [{"kieli": "fi", "arvo": "filosofian maisteri"}]
+    "tutkintonimike": [
+      {"koodiUri": "tutkintonimikekk_110#2", "nimi": {"fi": "filosofian maisteri", "sv": "filosofie magister", "en": "Master of Science"}}
+    ]
   },
   "toteutukset": [
-    {"oid": "1.2.246.562.17.00000000000000008103", "nimi": {"fi": "Toteutus"}}
+    {
+      "oid": "1.2.246.562.17.00000000000000008103",
+      "koulutusOid": "1.2.246.562.13.00000000000000002744",
+      "nimi": {"fi": "Toteutus", "en": "Implementation"},
+      "metadata": {
+        "kuvaus": {
+          "en": "<p>Much of the built environment does not sound the way it does by chance.</p>",
+          "fi": "<p>Toteutuksen   kuvaus &amp; lis&auml;tieto.</p>"
+        },
+        "osaamistavoitteet": {"fi": "<p>Toteutuksen osaamistavoitteet.</p>"},
+        "ammattinimikkeet": [
+          {"kieli": "fi", "arvo": "äänisuunnittelija"},
+          {"kieli": "fi", "arvo": "konsultti"},
+          {"kieli": "en", "arvo": "sound designer"}
+        ],
+        "asiasanat": [
+          {"kieli": "fi", "arvo": "tekninen psykoakustiikka"},
+          {"kieli": "fi", "arvo": "kuulo"}
+        ]
+      }
+    }
   ]
 }

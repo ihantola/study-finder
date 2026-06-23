@@ -66,6 +66,34 @@ def terms_by_lang(items: Any, languages: tuple[str, ...]) -> str:
     return "; ".join(allvals)
 
 
+def koodi_names(value: Any, languages: tuple[str, ...]) -> str:
+    """Resolve konfo "koodi" objects to a readable string.
+
+    The external API wraps classified values as ``{"koodiUri": ..., "nimi":
+    {"fi": ..., "sv": ..., "en": ...}}`` (e.g. ``tutkintonimike``), sometimes in
+    a list. Returns the localized ``nimi`` value(s), joined with "; ". Falls back
+    to treating ``value`` itself as a multilingual block.
+    """
+    if isinstance(value, list):
+        names = [koodi_names(item, languages) for item in value]
+        return "; ".join(name for name in names if name)
+    if isinstance(value, dict) and "nimi" in value:
+        return pick_lang(value["nimi"], languages)
+    return pick_lang(value, languages)
+
+
+def eqf_level(value: Any) -> str:
+    """Extract the numeric EQF level from the koodi object(s), e.g. "7"."""
+    if isinstance(value, list):
+        value = value[0] if value else None
+    if isinstance(value, dict):
+        uri = str(value.get("koodiUri", ""))
+        match = re.search(r"(\d+)", uri)
+        return match.group(1) if match else ""
+    match = re.search(r"(\d+)", str(value or ""))
+    return match.group(1) if match else ""
+
+
 def normalize(
     koulutus: dict[str, Any],
     toteutus: dict[str, Any] | None,
@@ -86,10 +114,9 @@ def normalize(
         "toteutus_oid": (toteutus or {}).get("oid", ""),
         "nimi": pick_lang(koulutus.get("nimi"), languages),
         "koulutustyyppi": koulutus.get("koulutustyyppi", ""),
-        "tutkintonimike": terms_by_lang(k_md.get("tutkintonimike"), languages)
-        or pick_lang(k_md.get("tutkintonimike"), languages),
+        "tutkintonimike": koodi_names(k_md.get("tutkintonimike"), languages),
         "organisaatio": pick_lang((koulutus.get("organisaatio") or {}).get("nimi"), languages),
-        "eqf": str(koulutus.get("eqf", "")),
+        "eqf": eqf_level(koulutus.get("eqf")),
         "description": description,
         "learning_goals": learning_goals,
         "job_titles": terms_by_lang(t_md.get("ammattinimikkeet"), languages),

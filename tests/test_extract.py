@@ -10,7 +10,14 @@ import responses
 from study_finder import api
 from study_finder.client import KonfoClient
 from study_finder.config import Config
-from study_finder.extract import normalize, pick_lang, strip_html, terms_by_lang
+from study_finder.extract import (
+    eqf_level,
+    koodi_names,
+    normalize,
+    pick_lang,
+    strip_html,
+    terms_by_lang,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -42,10 +49,27 @@ def test_terms_by_lang_picks_language_then_falls_back():
     assert terms_by_lang([], ("fi",)) == ""
 
 
+def test_koodi_names_resolves_external_koodi_objects():
+    value = [
+        {"koodiUri": "tutkintonimikekk_110#2", "nimi": {"fi": "filosofian maisteri", "en": "Master of Science"}},
+    ]
+    assert koodi_names(value, ("fi", "en")) == "filosofian maisteri"
+    assert koodi_names(value, ("en", "fi")) == "Master of Science"
+    assert koodi_names(None, ("fi",)) == ""
+    # also tolerates a bare multilingual block
+    assert koodi_names({"fi": "Suomi"}, ("fi",)) == "Suomi"
+
+
+def test_eqf_level_extracts_number():
+    assert eqf_level([{"koodiUri": "eqf_7", "nimi": {"fi": "Taso 7"}}]) == "7"
+    assert eqf_level({"koodiUri": "eqf_6"}) == "6"
+    assert eqf_level(None) == ""
+
+
 # -- normalization -------------------------------------------------------
 def test_normalize_merges_koulutus_and_toteutus():
     koulutus = _load("koulutus.json")
-    toteutus = _load("toteutus.json")
+    toteutus = api.toteutukset(koulutus)[0]
     rec = normalize(koulutus, toteutus, languages=("fi", "en", "sv"))
 
     assert rec["koulutus_oid"] == "1.2.246.562.13.00000000000000002744"
@@ -53,6 +77,7 @@ def test_normalize_merges_koulutus_and_toteutus():
     assert rec["koulutustyyppi"] == "yo"
     assert rec["organisaatio"] == "Aalto-yliopisto"
     assert rec["tutkintonimike"] == "filosofian maisteri"
+    assert rec["eqf"] == "7"
     # toteutus text is preferred over koulutus text
     assert rec["learning_goals"] == "Toteutuksen osaamistavoitteet."
     # career signals come from the toteutus
@@ -75,7 +100,7 @@ def test_client_fetches_and_caches(tmp_path):
     koulutus = _load("koulutus.json")
     responses.add(
         responses.GET,
-        f"{cfg.base_url}/koulutus/{koulutus['oid']}",
+        f"{cfg.base_url}/external/koulutus/{koulutus['oid']}",
         json=koulutus,
         status=200,
     )
@@ -89,6 +114,8 @@ def test_client_fetches_and_caches(tmp_path):
     assert len(responses.calls) == 1
 
 
-def test_toteutus_oids_extraction():
+def test_toteutukset_extraction():
     koulutus = _load("koulutus.json")
-    assert api.toteutus_oids(koulutus) == ["1.2.246.562.17.00000000000000008103"]
+    embedded = api.toteutukset(koulutus)
+    assert len(embedded) == 1
+    assert embedded[0]["oid"] == "1.2.246.562.17.00000000000000008103"

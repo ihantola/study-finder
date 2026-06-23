@@ -110,7 +110,8 @@ python -m study_finder --keyword tietojenkäsittely --limit 5
 
 # Fetch ALL ICT programmes from universities of applied sciences + universities.
 # --koulutusala defaults to ICT; --all paginates through every match (~180
-# programmes, a few minutes on first run; responses are then cached):
+# programmes). With the default 2–10s random delay this takes ~15–20 min on the
+# first run; responses are then cached so re-runs are instant:
 python -m study_finder --koulutustyyppi amk,yo --all --out data/processed/ict_amk_yo.csv
 ```
 
@@ -133,12 +134,20 @@ the cache), `-v` (verbose). Run `python -m study_finder --help` for all options.
 The HTTP client (`study_finder/client.py`):
 
 - sends a generic `User-Agent` and `Caller-Id` — **no personal email**,
-- throttles between live requests (`KONFO_THROTTLE_SECONDS`, default 0.5s),
+- waits a **random delay** between live requests, drawn uniformly from
+  `KONFO_THROTTLE_MIN_SECONDS`..`KONFO_THROTTLE_MAX_SECONDS` (default **2–10s**);
+  set both to `0` to disable,
 - retries transient failures (429 / 5xx) with exponential backoff,
 - caches every raw response under `data/raw/`, so re-runs don't re-hit the API.
 
 All of these are configurable via environment variables (see
-`study_finder/config.py`), optionally through a `.env` file.
+`study_finder/config.py`), optionally through a `.env` file. For example, to be
+extra polite per the site's robots.txt (`crawl-delay: 30`):
+
+```bash
+KONFO_THROTTLE_MIN_SECONDS=30 KONFO_THROTTLE_MAX_SECONDS=30 \
+  python -m study_finder --koulutustyyppi amk,yo --all
+```
 
 ## Running the tests
 

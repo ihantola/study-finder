@@ -30,8 +30,10 @@ class Config:
     base_url: str = field(default_factory=lambda: _env("KONFO_BASE_URL", "https://opintopolku.fi/konfo-backend"))
     # Preferred languages, in priority order, for picking multilingual text.
     languages: tuple[str, ...] = field(default_factory=lambda: tuple(_env("KONFO_LANGUAGES", "fi,en,sv").split(",")))
-    # Seconds to wait between live API requests (politeness).
-    throttle_seconds: float = field(default_factory=lambda: float(_env("KONFO_THROTTLE_SECONDS", "0.5")))
+    # Politeness: each live request waits a random delay drawn uniformly from
+    # [throttle_min_seconds, throttle_max_seconds]. Set both to 0 to disable.
+    throttle_min_seconds: float = field(default_factory=lambda: float(_env("KONFO_THROTTLE_MIN_SECONDS", "2")))
+    throttle_max_seconds: float = field(default_factory=lambda: float(_env("KONFO_THROTTLE_MAX_SECONDS", "10")))
     # Generic identification — deliberately NOT a personal email.
     user_agent: str = field(
         default_factory=lambda: _env("KONFO_USER_AGENT", "study-finder/0.1 (+https://github.com/study-finder)")

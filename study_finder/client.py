@@ -2,7 +2,7 @@
 
 Responsibilities:
 - send a generic ``User-Agent`` / ``Caller-Id`` (no personal email),
-- throttle between live requests,
+- throttle between live requests with a random delay (configurable range),
 - retry transient failures (429 / 5xx) with exponential backoff,
 - cache raw JSON responses on disk so repeated runs do not re-hit the API.
 """
@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import random
 import time
 from pathlib import Path
 from typing import Any
@@ -53,9 +54,16 @@ class KonfoClient:
         return self.config.cache_dir / f"{slug}_{digest}.json"
 
     # -- throttling ------------------------------------------------------
+    def _delay_seconds(self) -> float:
+        """A random per-request delay drawn from the configured range."""
+        lo = max(self.config.throttle_min_seconds, 0.0)
+        hi = max(self.config.throttle_max_seconds, lo)
+        return random.uniform(lo, hi) if hi > lo else lo
+
     def _throttle(self) -> None:
+        target = self._delay_seconds()
         elapsed = time.monotonic() - self._last_request_ts
-        wait = self.config.throttle_seconds - elapsed
+        wait = target - elapsed
         if wait > 0:
             time.sleep(wait)
         self._last_request_ts = time.monotonic()

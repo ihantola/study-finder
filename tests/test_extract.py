@@ -132,7 +132,7 @@ def test_normalize_without_toteutus_falls_back_to_koulutus():
 # -- client / api (mocked HTTP) -----------------------------------------
 @responses.activate
 def test_client_fetches_and_caches(tmp_path):
-    cfg = Config(cache_dir=tmp_path, throttle_seconds=0.0)
+    cfg = Config(cache_dir=tmp_path, throttle_min_seconds=0.0, throttle_max_seconds=0.0)
     koulutus = _load("koulutus.json")
     responses.add(
         responses.GET,
@@ -152,7 +152,7 @@ def test_client_fetches_and_caches(tmp_path):
 
 @responses.activate
 def test_search_oids_paginates(tmp_path):
-    cfg = Config(cache_dir=tmp_path, throttle_seconds=0.0)
+    cfg = Config(cache_dir=tmp_path, throttle_min_seconds=0.0, throttle_max_seconds=0.0)
     url = f"{cfg.base_url}/external/search/koulutukset"
     # total=3, two pages of size 2
     responses.add(responses.GET, url, json={"total": 3, "hits": [{"oid": "a"}, {"oid": "b"}]}, status=200)
@@ -167,7 +167,7 @@ def test_search_oids_paginates(tmp_path):
 
 @responses.activate
 def test_search_oids_respects_max_results(tmp_path):
-    cfg = Config(cache_dir=tmp_path, throttle_seconds=0.0)
+    cfg = Config(cache_dir=tmp_path, throttle_min_seconds=0.0, throttle_max_seconds=0.0)
     url = f"{cfg.base_url}/external/search/koulutukset"
     responses.add(responses.GET, url, json={"total": 100, "hits": [{"oid": "a"}, {"oid": "b"}]}, status=200)
     client = KonfoClient(config=cfg)
@@ -183,3 +183,16 @@ def test_toteutukset_extraction():
     embedded = api.toteutukset(koulutus)
     assert len(embedded) == 1
     assert embedded[0]["oid"] == "1.2.246.562.17.00000000000000008103"
+
+
+def test_delay_seconds_within_configured_range(tmp_path):
+    cfg = Config(cache_dir=tmp_path, throttle_min_seconds=2.0, throttle_max_seconds=10.0)
+    client = KonfoClient(config=cfg, use_cache=False)
+    for _ in range(50):
+        assert 2.0 <= client._delay_seconds() <= 10.0
+
+
+def test_delay_seconds_disabled_when_zero(tmp_path):
+    cfg = Config(cache_dir=tmp_path, throttle_min_seconds=0.0, throttle_max_seconds=0.0)
+    client = KonfoClient(config=cfg, use_cache=False)
+    assert client._delay_seconds() == 0.0

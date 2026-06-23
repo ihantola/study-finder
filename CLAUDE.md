@@ -74,8 +74,15 @@ changes. Key points the extraction logic depends on:
 
 - Base URL is `https://opintopolku.fi/konfo-backend`. The
   `konfo-backend.opintopolku.fi` host in some docs does **not** resolve.
-- Endpoints: `/search/koulutukset`, `/koulutus/{oid}`, `/toteutus/{oid}`.
-  Treat Swagger (`/konfo-backend/swagger`) as source of truth for any new path.
+- Use **only `External`-tagged endpoints** from the Swagger spec
+  (`/konfo-backend/swagger.yaml`): `/external/search/koulutukset`,
+  `/external/koulutus/{oid}`, `/external/toteutus/{oid}`. Fetching a koulutus
+  with `?toteutukset=true` embeds its toteutukset (with full `metadata`), so the
+  pipeline makes one request per degree and never calls `/external/toteutus`.
+- The External API wraps classified values as koodi objects
+  (`{"koodiUri", "nimi": {...}}`) for `tutkintonimike`/`eqf`/`nqf` — handled by
+  `extract.koodi_names` / `extract.eqf_level`. Free text is `{fi,sv,en}` with
+  HTML; term lists (`ammattinimikkeet`, `asiasanat`) are `[{kieli,arvo}]`.
 
 ## Conventions / gotchas
 

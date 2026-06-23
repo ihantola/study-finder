@@ -20,6 +20,12 @@ verified.
 
 - **Base URL**: `https://opintopolku.fi/konfo-backend`
 - Swagger docs: https://opintopolku.fi/konfo-backend/swagger
+  (spec: https://opintopolku.fi/konfo-backend/swagger.yaml)
+
+This tool uses **only the `External`-tagged endpoints** from the spec:
+`/external/search/koulutukset`, `/external/koulutus/{oid}` and
+`/external/toteutus/{oid}`. Fetching a programme with `?toteutukset=true` embeds
+its implementations (with full metadata) in a single request.
 
 > Note: the API is served under the main `opintopolku.fi` domain. The
 > `konfo-backend.opintopolku.fi` host that appears in some docs does **not**

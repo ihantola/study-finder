@@ -1,3 +1,7 @@
+# study-finder: cached raw API responses and generated output
+data/raw/
+data/processed/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

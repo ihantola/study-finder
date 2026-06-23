@@ -1,0 +1,9 @@
+[tool.pytest.ini_options]
+# Make the project root importable so `pytest` works regardless of how it is
+# invoked (`pytest`, `python -m pytest`, IDE runners, etc.).
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"

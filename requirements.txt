@@ -1,0 +1,11 @@
+# Runtime dependencies for study-finder
+# Install with: pip install -r requirements.txt
+
+# HTTP client for the konfo-backend API
+requests>=2.31
+
+# Data handling and analysis
+pandas>=2.2
+
+# Configuration / environment
+python-dotenv>=1.0

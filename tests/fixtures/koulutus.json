@@ -1,0 +1,21 @@
+{
+  "oid": "1.2.246.562.13.00000000000000002744",
+  "koulutustyyppi": "yo",
+  "eqf": "7",
+  "nimi": {
+    "fi": "Acoustics and Audio Technology, Master of Science (Technology) (2 yrs)",
+    "en": "Acoustics and Audio Technology, Master of Science (Technology) (2 yrs)",
+    "sv": "Acoustics and Audio Technology, Master of Science (Technology) (2 yrs)"
+  },
+  "organisaatio": {
+    "nimi": {"fi": "Aalto-yliopisto", "en": "Aalto University", "sv": "Aalto-universitetet"}
+  },
+  "metadata": {
+    "kuvaus": {"fi": "<p>Kuvaus suomeksi.</p>", "en": "<p>Description in English.</p>"},
+    "osaamistavoitteet": {"fi": "<p>Yleiset osaamistavoitteet.</p>"},
+    "tutkintonimike": [{"kieli": "fi", "arvo": "filosofian maisteri"}]
+  },
+  "toteutukset": [
+    {"oid": "1.2.246.562.17.00000000000000008103", "nimi": {"fi": "Toteutus"}}
+  ]
+}

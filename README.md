@@ -1,0 +1,2 @@
+# study-finder
+LLM koulutuksen testirepo

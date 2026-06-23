@@ -12,8 +12,11 @@ from study_finder.client import KonfoClient
 from study_finder.config import Config
 from study_finder.extract import (
     eqf_level,
+    extent,
     koodi_names,
+    lisatiedot_text,
     normalize,
+    osaamisalat_names,
     pick_lang,
     strip_html,
     terms_by_lang,
@@ -66,6 +69,34 @@ def test_eqf_level_extracts_number():
     assert eqf_level(None) == ""
 
 
+def test_osaamisalat_names_handles_both_shapes():
+    kk = [{"nimi": {"fi": "Ohjelmistotuotanto", "en": "Software"}}]
+    amm = [{"koodi": {"koodiUri": "osaamisala_1", "nimi": {"fi": "Ohjelmistokehittäjä"}}}]
+    assert osaamisalat_names(kk, ("fi",)) == "Ohjelmistotuotanto"
+    assert osaamisalat_names(amm, ("fi",)) == "Ohjelmistokehittäjä"
+    assert osaamisalat_names(None, ("fi",)) == ""
+
+
+def test_lisatiedot_text_renders_titled_sections():
+    items = [
+        {
+            "otsikko": {"koodiUri": "x_03", "nimi": {"fi": "Uramahdollisuudet"}},
+            "teksti": {"fi": "<p>Työllistyy asiantuntijaksi.</p>"},
+        }
+    ]
+    assert lisatiedot_text(items, ("fi",)) == "Uramahdollisuudet: Työllistyy asiantuntijaksi."
+    assert lisatiedot_text([], ("fi",)) == ""
+
+
+def test_extent_formats_credits():
+    md = {
+        "opintojenLaajuusNumero": 120.0,
+        "opintojenLaajuusyksikko": {"koodiUri": "u_2", "nimi": {"fi": "opintopistettä"}},
+    }
+    assert extent(md, ("fi",)) == "120 opintopistettä"
+    assert extent({}, ("fi",)) == ""
+
+
 # -- normalization -------------------------------------------------------
 def test_normalize_merges_koulutus_and_toteutus():
     koulutus = _load("koulutus.json")
@@ -83,6 +114,11 @@ def test_normalize_merges_koulutus_and_toteutus():
     # career signals come from the toteutus
     assert rec["job_titles"] == "äänisuunnittelija; konsultti"
     assert rec["keywords"] == "tekninen psykoakustiikka; kuulo"
+    assert rec["specializations"] == "Äänentutkimus"
+    # koulutus-level context fields
+    assert rec["field_of_study"] == "Tietojenkäsittely ja tietoliikenne (ICT)"
+    assert rec["credits"] == "120 opintopistettä"
+    assert rec["additional_info"] == "Uramahdollisuudet: Valmistuneet työllistyvät asiantuntijatehtäviin."
 
 
 def test_normalize_without_toteutus_falls_back_to_koulutus():
@@ -112,6 +148,34 @@ def test_client_fetches_and_caches(tmp_path):
     second = api.get_koulutus(client, koulutus["oid"])
     assert second == first
     assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_search_oids_paginates(tmp_path):
+    cfg = Config(cache_dir=tmp_path, throttle_seconds=0.0)
+    url = f"{cfg.base_url}/external/search/koulutukset"
+    # total=3, two pages of size 2
+    responses.add(responses.GET, url, json={"total": 3, "hits": [{"oid": "a"}, {"oid": "b"}]}, status=200)
+    responses.add(responses.GET, url, json={"total": 3, "hits": [{"oid": "c"}]}, status=200)
+    client = KonfoClient(config=cfg)
+
+    oids, total = api.search_oids(client, koulutustyyppi="amk,yo", page_size=2)
+    assert total == 3
+    assert oids == ["a", "b", "c"]
+    assert len(responses.calls) == 2
+
+
+@responses.activate
+def test_search_oids_respects_max_results(tmp_path):
+    cfg = Config(cache_dir=tmp_path, throttle_seconds=0.0)
+    url = f"{cfg.base_url}/external/search/koulutukset"
+    responses.add(responses.GET, url, json={"total": 100, "hits": [{"oid": "a"}, {"oid": "b"}]}, status=200)
+    client = KonfoClient(config=cfg)
+
+    oids, total = api.search_oids(client, max_results=1, page_size=2)
+    assert oids == ["a"]
+    assert total == 100
+    assert len(responses.calls) == 1  # stopped after first page
 
 
 def test_toteutukset_extraction():

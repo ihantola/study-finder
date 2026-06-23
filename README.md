@@ -107,11 +107,23 @@ python -m study_finder --limit 20 --out data/processed/ict.csv
 
 # Free-text keyword search within ICT:
 python -m study_finder --keyword tietojenkäsittely --limit 5
+
+# Fetch ALL ICT programmes from universities of applied sciences + universities.
+# --koulutusala defaults to ICT; --all paginates through every match (~180
+# programmes, a few minutes on first run; responses are then cached):
+python -m study_finder --koulutustyyppi amk,yo --all --out data/processed/ict_amk_yo.csv
 ```
 
 Output is a CSV (default `data/processed/ict_programmes.csv`) with one row per
 (programme, implementation), including `job_titles`, `keywords`,
-`learning_goals` and `description`.
+`specializations`, `learning_goals`, `description`, `field_of_study`, `credits`
+and `additional_info`.
+
+> The konfo-backend API has **no** dedicated "uramahdollisuudet" (career
+> opportunities), "työllistyminen" or "jatko-opinnot" field — those website
+> sections aren't exposed as structured data. The career signal comes from job
+> titles + keywords + specialisations + learning goals (and sometimes free text
+> in `additional_info`). See [`docs/field-map.md`](docs/field-map.md).
 
 Useful flags: `--lang fi,en,sv` (text language priority), `--no-cache` (bypass
 the cache), `-v` (verbose). Run `python -m study_finder --help` for all options.

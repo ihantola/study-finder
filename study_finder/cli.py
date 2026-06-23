@@ -71,13 +71,23 @@ def main(argv: list[str] | None = None) -> int:
         "--limit",
         type=int,
         default=1,
-        help="Number of programmes to fetch from ICT search (default: 1 — safe for testing).",
+        help="Number of programmes to fetch from ICT search (default: 1 — safe for testing). Ignored with --all.",
+    )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Fetch ALL matching programmes (paginates through every result; ignores --limit).",
     )
     parser.add_argument("--keyword", help="Optional free-text search keyword.")
     parser.add_argument(
         "--koulutusala",
         default=ICT_KOULUTUSALA,
         help="Field-of-study filter (default: ICT). Pass empty string to disable.",
+    )
+    parser.add_argument(
+        "--koulutustyyppi",
+        help="Education-type filter, comma-separated, e.g. 'amk,yo' "
+        "(universities of applied sciences + universities).",
     )
     parser.add_argument(
         "--lang",
@@ -102,17 +112,16 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Fetching single programme: {args.oid}")
             records = _records_for_oid(client, args.oid, languages)
         else:
-            result = api.search_koulutukset(
+            koulutus_oids, total = api.search_oids(
                 client,
                 koulutusala=args.koulutusala or None,
+                koulutustyyppi=args.koulutustyyppi,
                 keyword=args.keyword,
-                size=args.limit,
                 lng=primary_lang,
+                max_results=None if args.all else args.limit,
             )
-            total = result.get("total", 0)
-            hits = result.get("hits", [])[: args.limit]
-            koulutus_oids = [h["oid"] for h in hits if h.get("oid")]
-            print(f"ICT search matched {total} programmes; fetching {len(koulutus_oids)} (limit={args.limit}).")
+            scope = "all" if args.all else f"limit={args.limit}"
+            print(f"Search matched {total} programmes; fetching {len(koulutus_oids)} ({scope}).")
             records = _build_records(client, koulutus_oids, languages)
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else "?"

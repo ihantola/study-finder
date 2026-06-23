@@ -21,18 +21,64 @@ def search_koulutukset(
     client: KonfoClient,
     *,
     koulutusala: str | None = ICT_KOULUTUSALA,
+    koulutustyyppi: str | None = None,
     keyword: str | None = None,
     size: int = 20,
     page: int = 1,
     lng: str = "fi",
 ) -> dict[str, Any]:
-    """Search programmes. Returns the raw ``{total, hits}`` payload."""
+    """Search programmes. Returns the raw ``{total, hits}`` payload.
+
+    ``koulutustyyppi`` is a comma-separated list of education-type codes, e.g.
+    ``"amk,yo"`` for universities of applied sciences + universities.
+    """
     params: dict[str, Any] = {"size": size, "page": page, "lng": lng}
     if koulutusala:
         params["koulutusala"] = koulutusala
+    if koulutustyyppi:
+        params["koulutustyyppi"] = koulutustyyppi
     if keyword:
         params["keyword"] = keyword
     return client.get_json("/external/search/koulutukset", params)
+
+
+def search_oids(
+    client: KonfoClient,
+    *,
+    koulutusala: str | None = ICT_KOULUTUSALA,
+    koulutustyyppi: str | None = None,
+    keyword: str | None = None,
+    lng: str = "fi",
+    max_results: int | None = None,
+    page_size: int = 100,
+) -> tuple[list[str], int]:
+    """Page through search results and collect koulutus oids.
+
+    Returns ``(oids, total)`` where ``total`` is the full match count reported by
+    the API. Pass ``max_results`` to stop early (e.g. for a quick test).
+    """
+    oids: list[str] = []
+    total = 0
+    page = 1
+    while True:
+        result = search_koulutukset(
+            client,
+            koulutusala=koulutusala,
+            koulutustyyppi=koulutustyyppi,
+            keyword=keyword,
+            size=page_size,
+            page=page,
+            lng=lng,
+        )
+        total = result.get("total", 0)
+        hits = result.get("hits", []) or []
+        oids.extend(h["oid"] for h in hits if h.get("oid"))
+        if max_results is not None and len(oids) >= max_results:
+            return oids[:max_results], total
+        if not hits or len(oids) >= total:
+            break
+        page += 1
+    return oids, total
 
 
 def get_koulutus(client: KonfoClient, oid: str, *, with_toteutukset: bool = True) -> dict[str, Any]:

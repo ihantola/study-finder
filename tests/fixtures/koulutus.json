@@ -13,6 +13,15 @@
   "metadata": {
     "kuvaus": {"fi": "<p>Kuvaus suomeksi.</p>", "en": "<p>Description in English.</p>"},
     "osaamistavoitteet": {"fi": "<p>Yleiset osaamistavoitteet.</p>"},
+    "koulutusala": [
+      {"koodiUri": "kansallinenkoulutusluokitus2016koulutusalataso1_06", "nimi": {"fi": "Tietojenkäsittely ja tietoliikenne (ICT)", "en": "ICT"}}
+    ],
+    "opintojenLaajuusNumero": 120.0,
+    "opintojenLaajuusyksikko": {"koodiUri": "opintojenlaajuusyksikko_2", "nimi": {"fi": "opintopistettä", "en": "ECTS credits"}},
+    "lisatiedot": [
+      {"otsikko": {"koodiUri": "koulutuksenlisatiedot_03#1", "nimi": {"fi": "Uramahdollisuudet", "en": "Career options"}},
+       "teksti": {"fi": "<p>Valmistuneet työllistyvät asiantuntijatehtäviin.</p>"}}
+    ],
     "tutkintonimike": [
       {"koodiUri": "tutkintonimikekk_110#2", "nimi": {"fi": "filosofian maisteri", "sv": "filosofie magister", "en": "Master of Science"}}
     ]
@@ -36,6 +45,9 @@
         "asiasanat": [
           {"kieli": "fi", "arvo": "tekninen psykoakustiikka"},
           {"kieli": "fi", "arvo": "kuulo"}
+        ],
+        "osaamisalat": [
+          {"nimi": {"fi": "Äänentutkimus", "en": "Acoustics"}, "kuvaus": {"fi": "<p>...</p>"}}
         ]
       }
     }

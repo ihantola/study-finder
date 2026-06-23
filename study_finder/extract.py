@@ -6,7 +6,16 @@ fields live in ``metadata``:
 - ``kuvaus`` (description) — on both entities
 - ``ammattinimikkeet`` (job titles) — on toteutus
 - ``asiasanat`` (keywords) — on toteutus
+- ``osaamisalat`` (specialisations) — on toteutus
 - ``tutkintonimike`` (degree title) — on koulutus
+- ``koulutusala`` (field of study) — on koulutus
+- ``opintojenLaajuusNumero`` + unit (credits) — on koulutus/toteutus
+- ``lisatiedot`` (titled additional-info sections) — on koulutus
+
+Note: the konfo-backend API has no dedicated "uramahdollisuudet" (career
+opportunities), "tyollistyminen" (employment) or "jatko-opinnot" (further
+study) fields. Career signal comes from job titles + keywords + specialisations
++ learning goals, and occasionally from free-text in ``lisatiedot``/``kuvaus``.
 """
 
 from __future__ import annotations
@@ -94,6 +103,53 @@ def eqf_level(value: Any) -> str:
     return match.group(1) if match else ""
 
 
+def osaamisalat_names(items: Any, languages: tuple[str, ...]) -> str:
+    """Join specialisation (osaamisala) names.
+
+    Two shapes exist: korkeakoulu specialisations carry ``nimi`` directly;
+    vocational (amm) ones carry the name under ``koodi.nimi``.
+    """
+    if not isinstance(items, list):
+        return ""
+    names = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        name = pick_lang(item.get("nimi"), languages) or koodi_names(item.get("koodi"), languages)
+        if name:
+            names.append(name)
+    return "; ".join(names)
+
+
+def lisatiedot_text(items: Any, languages: tuple[str, ...]) -> str:
+    """Flatten titled additional-info sections (``lisatiedot``).
+
+    Each item is ``{"otsikko": <koodi>, "teksti": <multilingual HTML>}``. Renders
+    as ``Heading: text`` sections joined by " | ".
+    """
+    if not isinstance(items, list):
+        return ""
+    parts = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        heading = koodi_names(item.get("otsikko"), languages)
+        body = pick_lang(item.get("teksti"), languages)
+        if body:
+            parts.append(f"{heading}: {body}" if heading else body)
+    return " | ".join(parts)
+
+
+def extent(metadata: dict[str, Any], languages: tuple[str, ...]) -> str:
+    """Format the study extent, e.g. "210 opintopistettä"."""
+    num = metadata.get("opintojenLaajuusNumero")
+    if num is None:
+        return ""
+    amount = str(int(num)) if isinstance(num, float) and num.is_integer() else str(num)
+    unit = koodi_names(metadata.get("opintojenLaajuusyksikko"), languages)
+    return f"{amount} {unit}".strip()
+
+
 def normalize(
     koulutus: dict[str, Any],
     toteutus: dict[str, Any] | None,
@@ -117,8 +173,13 @@ def normalize(
         "tutkintonimike": koodi_names(k_md.get("tutkintonimike"), languages),
         "organisaatio": pick_lang((koulutus.get("organisaatio") or {}).get("nimi"), languages),
         "eqf": eqf_level(koulutus.get("eqf")),
+        "field_of_study": koodi_names(k_md.get("koulutusala"), languages),
+        "credits": extent(k_md, languages) or extent(t_md, languages),
         "description": description,
         "learning_goals": learning_goals,
+        "specializations": osaamisalat_names(t_md.get("osaamisalat"), languages),
         "job_titles": terms_by_lang(t_md.get("ammattinimikkeet"), languages),
         "keywords": terms_by_lang(t_md.get("asiasanat"), languages),
+        "additional_info": lisatiedot_text(k_md.get("lisatiedot"), languages)
+        or lisatiedot_text(t_md.get("lisatiedot"), languages),
     }

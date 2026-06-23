@@ -97,7 +97,8 @@ The extractor is a CLI. It defaults to fetching **one** programme so a quick
 test never crawls the whole catalogue — raise `--limit` deliberately.
 
 ```bash
-# Fetch a single degree by oid (best for a quick test):
+# Fetch a single programme by oid (best for a quick test). Accepts either a
+# koulutus oid (1.2.246.562.13.…) or a toteutus oid (1.2.246.562.17.…):
 python -m study_finder --oid 1.2.246.562.13.00000000000000002744
 
 # Fetch the first N programmes from the ICT field of study (default: 1):

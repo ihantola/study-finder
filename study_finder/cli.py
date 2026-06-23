@@ -20,6 +20,8 @@ import logging
 import sys
 from pathlib import Path
 
+import requests
+
 from . import api
 from .client import KonfoClient
 from .config import DEFAULT_CONFIG, ICT_KOULUTUSALA
@@ -42,11 +44,29 @@ def _build_records(client: KonfoClient, koulutus_oids: list[str], languages) -> 
     return records
 
 
+def _records_for_oid(client: KonfoClient, oid: str, languages) -> list[dict]:
+    """Build records for a single oid, accepting either a koulutus or a toteutus.
+
+    koulutus oids look like ``1.2.246.562.13.…`` and toteutus oids like
+    ``1.2.246.562.17.…``. For a toteutus we fetch it directly and look up its
+    parent koulutus so the record still carries degree-level fields.
+    """
+    if ".17." in oid:  # toteutus oid
+        toteutus = api.get_toteutus(client, oid)
+        parent_oid = toteutus.get("koulutusOid")
+        koulutus = api.get_koulutus(client, parent_oid, with_toteutukset=False) if parent_oid else {}
+        return [normalize(koulutus, toteutus, languages)]
+    return _build_records(client, [oid], languages)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="study_finder", description="Extract CS/ICT study-programme data from opintopolku.fi"
     )
-    parser.add_argument("--oid", help="Fetch a single koulutus (degree) by oid. Overrides search.")
+    parser.add_argument(
+        "--oid",
+        help="Fetch a single programme by oid (accepts a koulutus '…13…' or a toteutus '…17…' oid). Overrides search.",
+    )
     parser.add_argument(
         "--limit",
         type=int,
@@ -77,23 +97,38 @@ def main(argv: list[str] | None = None) -> int:
     primary_lang = languages[0] if languages else "fi"
     client = KonfoClient(use_cache=not args.no_cache)
 
-    if args.oid:
-        koulutus_oids = [args.oid]
-        print(f"Fetching single degree: {args.oid}")
-    else:
-        result = api.search_koulutukset(
-            client,
-            koulutusala=args.koulutusala or None,
-            keyword=args.keyword,
-            size=args.limit,
-            lng=primary_lang,
-        )
-        total = result.get("total", 0)
-        hits = result.get("hits", [])[: args.limit]
-        koulutus_oids = [h["oid"] for h in hits if h.get("oid")]
-        print(f"ICT search matched {total} programmes; fetching {len(koulutus_oids)} (limit={args.limit}).")
-
-    records = _build_records(client, koulutus_oids, languages)
+    try:
+        if args.oid:
+            print(f"Fetching single programme: {args.oid}")
+            records = _records_for_oid(client, args.oid, languages)
+        else:
+            result = api.search_koulutukset(
+                client,
+                koulutusala=args.koulutusala or None,
+                keyword=args.keyword,
+                size=args.limit,
+                lng=primary_lang,
+            )
+            total = result.get("total", 0)
+            hits = result.get("hits", [])[: args.limit]
+            koulutus_oids = [h["oid"] for h in hits if h.get("oid")]
+            print(f"ICT search matched {total} programmes; fetching {len(koulutus_oids)} (limit={args.limit}).")
+            records = _build_records(client, koulutus_oids, languages)
+    except requests.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else "?"
+        if status == 404 and args.oid:
+            print(
+                f"Error: no programme found for oid {args.oid} (HTTP 404).\n"
+                "Check the oid — koulutus oids look like '1.2.246.562.13.…' and "
+                "toteutus oids like '1.2.246.562.17.…'.",
+                file=sys.stderr,
+            )
+        else:
+            print(f"Error: API request failed (HTTP {status}).", file=sys.stderr)
+        return 1
+    except RuntimeError as exc:  # raised by the client after retries are exhausted
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
 
     out_path = write_csv(records, Path(args.out))
     print(f"Wrote {len(records)} row(s) to {out_path}")

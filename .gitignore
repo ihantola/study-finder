@@ -1,6 +1,5 @@
 # study-finder: cached raw API responses and generated output
-data/raw/
-data/processed/
+data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -85,23 +85,27 @@ def get_koulutus(client: KonfoClient, oid: str, *, with_toteutukset: bool = True
     """Fetch a single programme (koulutus) by oid.
 
     With ``with_toteutukset`` (the default) the response embeds the linked
-    toteutukset, each with full ``metadata`` — no separate toteutus calls
-    needed. The external endpoint returns all languages; selection happens at
-    normalization time.
+    toteutukset, each with full ``metadata`` — so the toteutukset can be pulled
+    out without separate per-toteutus calls.
     """
     params = {"toteutukset": "true"} if with_toteutukset else None
     return client.get_json(f"/external/koulutus/{oid}", params)
 
 
-def get_toteutus(client: KonfoClient, oid: str) -> dict[str, Any]:
-    """Fetch a single implementation (toteutus) by oid."""
-    return client.get_json(f"/external/toteutus/{oid}")
+def get_toteutus(client: KonfoClient, oid: str, *, with_koulutus: bool = False) -> dict[str, Any]:
+    """Fetch a single implementation (toteutus) by oid.
+
+    Defaults to the toteutus only; set ``with_koulutus`` to also embed the parent
+    programme.
+    """
+    params = {"koulutus": "true"} if with_koulutus else None
+    return client.get_json(f"/external/toteutus/{oid}", params)
 
 
 def toteutukset(koulutus: dict[str, Any]) -> list[dict[str, Any]]:
     """Return the embedded toteutus objects from a koulutus payload.
 
     Requires the koulutus to have been fetched with ``with_toteutukset=True``.
-    Only dict entries (i.e. embedded objects, not bare oids) are returned.
+    Only dict entries (full embedded objects, not bare oids) are returned.
     """
     return [t for t in (koulutus.get("toteutukset") or []) if isinstance(t, dict)]

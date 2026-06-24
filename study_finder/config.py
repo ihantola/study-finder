@@ -28,8 +28,6 @@ class Config:
     # The real host is opintopolku.fi/konfo-backend — the konfo-backend.* host
     # does not resolve. Treat Swagger as source of truth if this ever changes.
     base_url: str = field(default_factory=lambda: _env("KONFO_BASE_URL", "https://opintopolku.fi/konfo-backend"))
-    # Preferred languages, in priority order, for picking multilingual text.
-    languages: tuple[str, ...] = field(default_factory=lambda: tuple(_env("KONFO_LANGUAGES", "fi,en,sv").split(",")))
     # Politeness: each live request waits a random delay drawn uniformly from
     # [throttle_min_seconds, throttle_max_seconds]. Set both to 0 to disable.
     throttle_min_seconds: float = field(default_factory=lambda: float(_env("KONFO_THROTTLE_MIN_SECONDS", "2")))
@@ -39,9 +37,8 @@ class Config:
         default_factory=lambda: _env("KONFO_USER_AGENT", "study-finder/0.1 (+https://github.com/study-finder)")
     )
     caller_id: str = field(default_factory=lambda: _env("KONFO_CALLER_ID", "study-finder"))
-    # Where raw API responses are cached and processed output is written.
+    # On-disk cache of raw API responses (so re-runs don't re-hit the API).
     cache_dir: Path = field(default_factory=lambda: Path(_env("KONFO_CACHE_DIR", "data/raw")))
-    processed_dir: Path = field(default_factory=lambda: Path(_env("KONFO_PROCESSED_DIR", "data/processed")))
     # Retry behaviour for transient failures.
     max_retries: int = field(default_factory=lambda: int(_env("KONFO_MAX_RETRIES", "3")))
 

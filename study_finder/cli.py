@@ -1,21 +1,32 @@
 """Command-line entry point for study-finder.
 
+Downloads raw **toteutus** (implementation) JSON from opintopolku.fi
+(konfo-backend External API) and writes one file per toteutus into an output
+directory. There is no normalization — the raw API responses are the product.
+
+A koulutus (programme) is only used to discover its toteutukset; the koulutus
+object itself is not saved.
+
 Examples
 --------
-Fetch a SINGLE programme by oid (best for a quick test — one degree only)::
+Fetch one toteutus by oid (toteutus '…17…', or every toteutus of a koulutus
+'…13…')::
 
-    python -m study_finder --oid 1.2.246.562.13.00000000000000002744
+    python -m study_finder --oid 1.2.246.562.17.00000000000000003821
 
-Fetch the first N ICT programmes from search (defaults to 1, so it never
-crawls the whole catalogue unless you raise --limit)::
+Fetch all toteutukset of the first N ICT programmes (default 1)::
 
     python -m study_finder --limit 1
-    python -m study_finder --limit 20 --out data/processed/ict.csv
+
+Fetch every ICT toteutus from universities of applied sciences + universities::
+
+    python -m study_finder --koulutustyyppi amk,yo --all --out-dir data/toteutukset
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 import time
@@ -25,9 +36,7 @@ import requests
 
 from . import api
 from .client import KonfoClient
-from .config import DEFAULT_CONFIG, ICT_KOULUTUSALA
-from .extract import normalize
-from .storage import write_csv
+from .config import ICT_KOULUTUSALA
 
 
 def _format_duration(seconds: float) -> str:
@@ -42,65 +51,75 @@ def _format_duration(seconds: float) -> str:
     return f"{hours}h {minutes}m"
 
 
-def _build_records(client: KonfoClient, koulutus_oids: list[str], languages) -> list[dict]:
-    records: list[dict] = []
+def _toteutukset_with_parent(koulutus: dict) -> list[dict]:
+    """Embedded toteutukset, each with the parent koulutus attached under
+    ``"koulutus"`` so degree-level info (koulutusala, koulutustyyppi,
+    tutkintonimike, ...) is preserved. The parent's own ``toteutukset`` list is
+    stripped to avoid duplication.
+    """
+    parent = {k: v for k, v in koulutus.items() if k != "toteutukset"}
+    return [{**t, "koulutus": parent} for t in api.toteutukset(koulutus)]
+
+
+def _toteutukset_for_oid(client: KonfoClient, oid: str) -> list[dict]:
+    """Toteutus objects for a single oid (toteutus oid, or all of a koulutus)."""
+    if ".17." in oid:  # already a toteutus oid — embed its parent koulutus
+        return [api.get_toteutus(client, oid, with_koulutus=True)]
+    koulutus = api.get_koulutus(client, oid, with_toteutukset=True)
+    return _toteutukset_with_parent(koulutus)
+
+
+def _toteutukset_for_koulutukset(client: KonfoClient, koulutus_oids: list[str]) -> list[dict]:
+    """Collect toteutus objects across many koulutus oids, with progress + ETA."""
+    objects: list[dict] = []
     total = len(koulutus_oids)
 
-    # Upfront estimate from the configured average delay (1 request per degree).
     avg_delay = (client.config.throttle_min_seconds + client.config.throttle_max_seconds) / 2
     if total > 1:
         print(
             f"Estimated time: ~{_format_duration(total * avg_delay)} "
-            f"(~{avg_delay:.0f}s/request; cached programmes are instant)."
+            f"(~{avg_delay:.0f}s/request; cached programmes are instant).",
+            flush=True,
         )
 
     start = time.monotonic()
     for i, oid in enumerate(koulutus_oids, 1):
-        # One request per degree: ?toteutukset=true embeds the implementations,
-        # each with full metadata, so no per-toteutus calls are needed.
         koulutus = api.get_koulutus(client, oid, with_toteutukset=True)
-        implementations = api.toteutukset(koulutus)
-        if not implementations:
-            records.append(normalize(koulutus, None, languages))
-        else:
-            for toteutus in implementations:
-                records.append(normalize(koulutus, toteutus, languages))
-
+        objects.extend(_toteutukset_with_parent(koulutus))
         if total > 1:
             elapsed = time.monotonic() - start
             eta = elapsed / i * (total - i)  # rolling average over completed items
             print(
-                f"\r  [{i}/{total}] elapsed {_format_duration(elapsed)}, ETA {_format_duration(eta)}      ",
+                f"\r  [{i}/{total}] programmes, {len(objects)} toteutukset, "
+                f"elapsed {_format_duration(elapsed)}, ETA {_format_duration(eta)}      ",
                 end="",
                 flush=True,
             )
     if total > 1:
-        print()  # newline after the in-place progress line
-    return records
+        print()
+    return objects
 
 
-def _records_for_oid(client: KonfoClient, oid: str, languages) -> list[dict]:
-    """Build records for a single oid, accepting either a koulutus or a toteutus.
-
-    koulutus oids look like ``1.2.246.562.13.…`` and toteutus oids like
-    ``1.2.246.562.17.…``. For a toteutus we fetch it directly and look up its
-    parent koulutus so the record still carries degree-level fields.
-    """
-    if ".17." in oid:  # toteutus oid
-        toteutus = api.get_toteutus(client, oid)
-        parent_oid = toteutus.get("koulutusOid")
-        koulutus = api.get_koulutus(client, parent_oid, with_toteutukset=False) if parent_oid else {}
-        return [normalize(koulutus, toteutus, languages)]
-    return _build_records(client, [oid], languages)
+def _write_toteutukset(objects: list[dict], out_dir: Path) -> int:
+    """Write each toteutus to ``out_dir/<oid>.json``. Returns the count written."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written = 0
+    for obj in objects:
+        oid = obj.get("oid")
+        if not oid:
+            continue
+        (out_dir / f"{oid}.json").write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+        written += 1
+    return written
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="study_finder", description="Extract CS/ICT study-programme data from opintopolku.fi"
+        prog="study_finder", description="Download raw toteutus (implementation) JSON from opintopolku.fi"
     )
     parser.add_argument(
         "--oid",
-        help="Fetch a single programme by oid (accepts a koulutus '…13…' or a toteutus '…17…' oid). Overrides search.",
+        help="Fetch by oid: a toteutus '…17…' (that one), or a koulutus '…13…' (all its toteutukset). Overrides search.",
     )
     parser.add_argument(
         "--limit",
@@ -125,11 +144,8 @@ def main(argv: list[str] | None = None) -> int:
         "(universities of applied sciences + universities).",
     )
     parser.add_argument(
-        "--lang",
-        default=",".join(DEFAULT_CONFIG.languages),
-        help="Comma-separated language priority for text fields (default: fi,en,sv).",
+        "--out-dir", default="data/toteutukset", help="Output directory; one <oid>.json file per toteutus."
     )
-    parser.add_argument("--out", default="data/processed/ict_programmes.csv", help="Output CSV path.")
     parser.add_argument("--no-cache", action="store_true", help="Bypass the on-disk raw response cache.")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging.")
     args = parser.parse_args(argv)
@@ -138,26 +154,24 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO, format="%(levelname)s %(name)s: %(message)s"
     )
 
-    languages = tuple(part.strip() for part in args.lang.split(",") if part.strip())
-    primary_lang = languages[0] if languages else "fi"
     client = KonfoClient(use_cache=not args.no_cache)
 
     try:
         if args.oid:
-            print(f"Fetching single programme: {args.oid}")
-            records = _records_for_oid(client, args.oid, languages)
+            print(f"Fetching toteutukset for: {args.oid}", flush=True)
+            objects = _toteutukset_for_oid(client, args.oid)
         else:
+            print("Searching for matching programmes…", flush=True)
             koulutus_oids, total = api.search_oids(
                 client,
                 koulutusala=args.koulutusala or None,
                 koulutustyyppi=args.koulutustyyppi,
                 keyword=args.keyword,
-                lng=primary_lang,
                 max_results=None if args.all else args.limit,
             )
             scope = "all" if args.all else f"limit={args.limit}"
-            print(f"Search matched {total} programmes; fetching {len(koulutus_oids)} ({scope}).")
-            records = _build_records(client, koulutus_oids, languages)
+            print(f"Search matched {total} programmes; fetching {len(koulutus_oids)} ({scope}).", flush=True)
+            objects = _toteutukset_for_koulutukset(client, koulutus_oids)
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else "?"
         if status == 404 and args.oid:
@@ -174,13 +188,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
-    out_path = write_csv(records, Path(args.out))
-    print(f"Wrote {len(records)} row(s) to {out_path}")
-    if records:
-        first = records[0]
-        print("\nSample row:")
-        for key in ("nimi", "koulutustyyppi", "tutkintonimike", "job_titles", "keywords"):
-            print(f"  {key}: {first.get(key, '')[:100]}")
+    written = _write_toteutukset(objects, Path(args.out_dir))
+    print(f"Wrote {written} toteutus file(s) to {args.out_dir}/")
     return 0
 
 

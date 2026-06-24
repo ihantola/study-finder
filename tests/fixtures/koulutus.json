@@ -31,7 +31,19 @@
       "oid": "1.2.246.562.17.00000000000000008103",
       "koulutusOid": "1.2.246.562.13.00000000000000002744",
       "nimi": {"fi": "Toteutus", "en": "Implementation"},
+      "organisaatio": {"nimi": {"fi": "Centria-ammattikorkeakoulu", "en": "Centria University of Applied Sciences"}},
       "metadata": {
+        "opetus": {
+          "opetuskieli": [{"koodiUri": "oppilaitoksenopetuskieli_4#2", "nimi": {"fi": "englanti", "en": "English"}}],
+          "opetustapa": [{"koodiUri": "opetuspaikkakk_1#1", "nimi": {"fi": "Lähiopetus", "en": "Contact teaching"}}],
+          "opetusaika": [{"koodiUri": "opetusaikakk_1#1", "nimi": {"fi": "Päiväopetus", "en": "Day time teaching"}}],
+          "suunniteltuKestoVuodet": 4,
+          "suunniteltuKestoKuukaudet": 0,
+          "maksut": [{"maksullisuustyyppi": "lukuvuosimaksu", "maksunMaara": 9500.0}]
+        },
+        "yhteyshenkilot": [
+          {"nimi": {"en": "EduExpo Team"}, "sahkoposti": {"en": "eduexpo@centria.fi"}}
+        ],
         "kuvaus": {
           "en": "<p>Much of the built environment does not sound the way it does by chance.</p>",
           "fi": "<p>Toteutuksen   kuvaus &amp; lis&auml;tieto.</p>"

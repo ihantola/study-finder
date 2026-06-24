@@ -1,5 +1,11 @@
 # study-finder: opintopolku.fi extraction service
 
+> **Historical planning document.** This is the original plan, written before
+> any code existed. It has since been implemented (and the design refined — e.g.
+> External-only endpoints, embedded toteutukset, more extracted fields, a random
+> request delay). For the current state see [`../README.md`](../README.md) and
+> the verified [`field-map.md`](field-map.md).
+
 ## Context
 
 We want a Python service that extracts study-programme data from Finland's

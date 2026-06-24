@@ -49,12 +49,17 @@ under `metadata`:
 | `kuvaus` | toteutus & koulutus | Description |
 | `ammattinimikkeet` | toteutus | **Job titles** — the strongest career signal |
 | `asiasanat` | toteutus | Keywords |
+| `osaamisalat` | toteutus | Specialisations |
 | `tutkintonimike` | koulutus | Degree title |
+| `koulutusala` | koulutus | Field of study |
+| credits | koulutus / toteutus | Study extent (e.g. "120 opintopistettä") |
+| `lisatiedot` | koulutus | Titled additional-info sections |
 
 Learning goals confirm the earlier hypothesis: they exist on both entities, but
-the toteutus text is the institution-specific one we prefer. There are no
-dedicated `tyollistyminen` / `jatko-opinnot` fields — the career signal comes
-from `ammattinimikkeet` + `asiasanat` + `osaamistavoitteet`.
+the toteutus text is the institution-specific one we prefer. There are **no**
+dedicated `uramahdollisuudet` / `tyollistyminen` / `jatko-opinnot` fields in the
+API — the career signal comes from `ammattinimikkeet` + `asiasanat` +
+`osaamisalat` + `osaamistavoitteet` (and occasionally free text in `lisatiedot`).
 
 Content is available in up to three languages (Finnish, Swedish, English) as
 `{"fi": ..., "sv": ..., "en": ...}` blocks and contains HTML. The extractor
@@ -125,6 +130,9 @@ and `additional_info`.
 > sections aren't exposed as structured data. The career signal comes from job
 > titles + keywords + specialisations + learning goals (and sometimes free text
 > in `additional_info`). See [`docs/field-map.md`](docs/field-map.md).
+
+For multi-programme runs the CLI prints an upfront time estimate and a live
+progress line with a refining ETA (e.g. `[42/180] elapsed 4m 12s, ETA 13m 48s`).
 
 Useful flags: `--lang fi,en,sv` (text language priority), `--no-cache` (bypass
 the cache), `-v` (verbose). Run `python -m study_finder --help` for all options.

@@ -24,9 +24,13 @@ ruff check .
 ruff format .
 
 # Run against the live API (defaults to ONE programme — see "Politeness")
-python -m study_finder --oid <koulutus-oid>  # single degree by oid
+python -m study_finder --oid <oid>           # single programme (koulutus …13… or toteutus …17… oid)
 python -m study_finder --limit 1             # first N ICT programmes from search
+python -m study_finder --koulutustyyppi amk,yo --all   # ALL ICT programmes (paginates)
 python -m study_finder --help                # all flags
+
+# Faster iteration: disable the polite delay (default is 2–10s random)
+KONFO_THROTTLE_MIN_SECONDS=0 KONFO_THROTTLE_MAX_SECONDS=0 python -m study_finder --limit 2
 ```
 
 ## Architecture
@@ -39,14 +43,19 @@ orchestrated by `cli.py`.
   (loaded from `.env`). Defines `ICT_KOULUTUSALA`, the koodisto URI used as the
   default field-of-study filter.
 - `client.py` — `KonfoClient`, the only module that does HTTP. Owns politeness
-  (throttle, retry/backoff) and an on-disk raw-response cache keyed by URL hash
-  under `data/raw/`. Cache hits short-circuit before any network call.
+  (a random per-request delay + retry/backoff) and an on-disk raw-response cache
+  keyed by URL hash under `data/raw/`. Cache hits short-circuit before any
+  network call (so they skip the delay too).
 - `api.py` — thin endpoint functions over `KonfoClient` (`search_koulutukset`,
-  `get_koulutus`, `get_toteutus`, `toteutus_oids`). No business logic.
+  `search_oids` which paginates, `get_koulutus`, `get_toteutus`, `toteutukset`).
+  No business logic.
 - `extract.py` — pure functions (no I/O) that flatten raw JSON into records.
   This is the most test-covered module.
 - `storage.py` — writes records to CSV via pandas.
 - `cli.py` / `__main__.py` — argparse entry point wiring the pipeline together.
+  Detects oid type (koulutus vs toteutus), paginates for `--all`, prints an
+  upfront time estimate + a live ETA, and turns API/404 errors into a clean
+  message + exit code 1 (no traceback).
 
 ### Data model (critical to understand before editing `extract.py`)
 
@@ -64,11 +73,16 @@ changes. Key points the extraction logic depends on:
 - `osaamistavoitteet` (learning goals) and `kuvaus` (description) exist on both
   entities; `extract.normalize` **prefers the toteutus value** and falls back
   to koulutus.
-- `ammattinimikkeet` (job titles) and `asiasanat` (keywords) — the strongest
-  career signals — exist **only on toteutus**.
+- `ammattinimikkeet` (job titles), `asiasanat` (keywords) and `osaamisalat`
+  (specialisations) — the strongest career signals — exist **only on toteutus**.
+- koulutus-level context comes from `koulutusala` (field of study),
+  `opintojenLaajuusNumero` + unit (credits) and `lisatiedot` (titled info
+  sections), handled by `koodi_names` / `extent` / `lisatiedot_text`.
 - Multilingual text is `{"fi":..., "sv":..., "en":...}` and contains **HTML**.
   `pick_lang` selects by priority order and strips HTML; term lists like
   `ammattinimikkeet` are `[{"kieli","arvo"}]` handled by `terms_by_lang`.
+- There is **no** `uramahdollisuudet` / `tyollistyminen` / `jatko-opinnot` field
+  in the API — don't add columns for them; the career signal is the fields above.
 
 ### API specifics
 
@@ -87,8 +101,12 @@ changes. Key points the extraction logic depends on:
 ## Conventions / gotchas
 
 - **Politeness is a hard requirement**: the client sends a generic
-  `User-Agent`/`Caller-Id` and **never a personal email**. `--limit` defaults to
-  1 so a test never crawls the full catalogue — preserve that safety default.
+  `User-Agent`/`Caller-Id` and **never a personal email**, and waits a random
+  delay (`KONFO_THROTTLE_MIN_SECONDS`..`KONFO_THROTTLE_MAX_SECONDS`, default
+  2–10s) between live requests. `--limit` defaults to 1 so a test never crawls
+  the full catalogue — preserve that safety default. The site's robots.txt
+  declares `crawl-delay: 30` (advisory; our API paths aren't in its Disallow
+  list) — keep the default delay conservative and easy to raise toward 30s.
 - Keep `extract.py` pure (no network/disk) so tests stay offline; route all
   HTTP through `KonfoClient`.
 - Tests must not hit the live API — use the fixtures in `tests/fixtures/` and

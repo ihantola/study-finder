@@ -8,6 +8,7 @@ from pathlib import Path
 import responses
 
 from study_finder import api
+from study_finder.cli import _format_duration
 from study_finder.client import KonfoClient
 from study_finder.config import Config
 from study_finder.extract import (
@@ -196,3 +197,11 @@ def test_delay_seconds_disabled_when_zero(tmp_path):
     cfg = Config(cache_dir=tmp_path, throttle_min_seconds=0.0, throttle_max_seconds=0.0)
     client = KonfoClient(config=cfg, use_cache=False)
     assert client._delay_seconds() == 0.0
+
+
+def test_format_duration():
+    assert _format_duration(0) == "0s"
+    assert _format_duration(45) == "45s"
+    assert _format_duration(90) == "1m 30s"
+    assert _format_duration(3661) == "1h 1m"
+    assert _format_duration(-5) == "0s"

@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import time
 from pathlib import Path
 
 import requests
@@ -29,18 +30,52 @@ from .extract import normalize
 from .storage import write_csv
 
 
+def _format_duration(seconds: float) -> str:
+    """Render a duration as a compact human string, e.g. "2m 30s"."""
+    seconds = int(round(max(seconds, 0)))
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes, secs = divmod(seconds, 60)
+    if minutes < 60:
+        return f"{minutes}m {secs}s"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes}m"
+
+
 def _build_records(client: KonfoClient, koulutus_oids: list[str], languages) -> list[dict]:
     records: list[dict] = []
-    for oid in koulutus_oids:
+    total = len(koulutus_oids)
+
+    # Upfront estimate from the configured average delay (1 request per degree).
+    avg_delay = (client.config.throttle_min_seconds + client.config.throttle_max_seconds) / 2
+    if total > 1:
+        print(
+            f"Estimated time: ~{_format_duration(total * avg_delay)} "
+            f"(~{avg_delay:.0f}s/request; cached programmes are instant)."
+        )
+
+    start = time.monotonic()
+    for i, oid in enumerate(koulutus_oids, 1):
         # One request per degree: ?toteutukset=true embeds the implementations,
         # each with full metadata, so no per-toteutus calls are needed.
         koulutus = api.get_koulutus(client, oid, with_toteutukset=True)
         implementations = api.toteutukset(koulutus)
         if not implementations:
             records.append(normalize(koulutus, None, languages))
-            continue
-        for toteutus in implementations:
-            records.append(normalize(koulutus, toteutus, languages))
+        else:
+            for toteutus in implementations:
+                records.append(normalize(koulutus, toteutus, languages))
+
+        if total > 1:
+            elapsed = time.monotonic() - start
+            eta = elapsed / i * (total - i)  # rolling average over completed items
+            print(
+                f"\r  [{i}/{total}] elapsed {_format_duration(elapsed)}, ETA {_format_duration(eta)}      ",
+                end="",
+                flush=True,
+            )
+    if total > 1:
+        print()  # newline after the in-place progress line
     return records
 
 

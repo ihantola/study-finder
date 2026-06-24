@@ -33,6 +33,9 @@ Multilingual text is `{"fi": ..., "sv": ..., "en": ...}` and contains **HTML**
 | `ammattinimikkeet` | **toteutus** | `metadata.ammattinimikkeet` | **Job titles** (career signal) |
 | `asiasanat` | **toteutus** | `metadata.asiasanat` | Keywords (career signal) |
 | `osaamisalat` | **toteutus** | `metadata.osaamisalat` | Specialisations (career signal); two shapes — see below |
+| teaching | **toteutus** | `metadata.opetus` | Language/format/time (koodi lists), duration (`suunniteltuKestoVuodet`/`Kuukaudet`), fees (`maksut`) |
+| `yhteyshenkilot` | **toteutus** | `metadata.yhteyshenkilot` | Contacts (`nimi`, `sahkoposti`, ...) |
+| provider | **toteutus** | `organisaatio.nimi` | Implementing institution (may differ from koulutus organisaatio) |
 | `tutkintonimike` | koulutus | `metadata.tutkintonimike` | Degree title — koodi objects (see below) |
 | `koulutusala` | koulutus | `metadata.koulutusala` | Field of study — koodi object |
 | credits | koulutus / toteutus | `metadata.opintojenLaajuusNumero` + `…yksikko` | Study extent, e.g. "120 opintopistettä" |
@@ -42,20 +45,21 @@ Multilingual text is `{"fi": ..., "sv": ..., "en": ...}` and contains **HTML**
 
 ## Value shapes
 
-The External API wraps classified values as **koodi objects** rather than the
-flat shapes the internal API uses:
+The tool saves these verbatim; this is what consumers of the raw JSON will see.
+The External API wraps classified values as **koodi objects**:
 
-- `tutkintonimike`, `eqf`, `nqf`: `[{"koodiUri": "eqf_7", "nimi": {"fi": ..., "sv": ..., "en": ...}}]`
-  — resolved via `extract.koodi_names` / `extract.eqf_level`.
-- `ammattinimikkeet`, `asiasanat`: `[{"kieli": "fi", "arvo": "..."}]` — resolved via `extract.terms_by_lang`.
+- `tutkintonimike`, `eqf`, `nqf`, `koulutusala`, `opetus.opetuskieli/opetustapa/opetusaika`:
+  `[{"koodiUri": "eqf_7", "nimi": {"fi": ..., "sv": ..., "en": ...}}]`.
+- `ammattinimikkeet`, `asiasanat`: `[{"kieli": "fi", "arvo": "..."}]`.
 - `osaamisalat`: two shapes — korkeakoulu items carry `nimi` directly; vocational
-  (`amm`) items carry it under `koodi.nimi` — resolved via `extract.osaamisalat_names`.
-- `lisatiedot`: `[{"otsikko": <koodi>, "teksti": <multilingual HTML>}]` — rendered
-  as `Heading: text` by `extract.lisatiedot_text`.
+  (`amm`) items carry it under `koodi.nimi`.
+- `lisatiedot`: `[{"otsikko": <koodi>, "teksti": <multilingual HTML>}]`.
+- `opetus`: object with the koodi lists above plus `suunniteltuKestoVuodet/Kuukaudet`
+  (duration), `maksut` (`[{maksullisuustyyppi, maksunMaara}]`), and `lisatiedot`.
 - free text (`kuvaus`, `osaamistavoitteet`, `nimi`): `{"fi": ..., "sv": ..., "en": ...}` with HTML.
 
-The README hypothesis ("learning goals live on toteutus") is confirmed: they
-exist on both, but the toteutus text is the institution-specific one we prefer.
+`osaamistavoitteet` and `kuvaus` exist on **both** koulutus and toteutus; the
+toteutus value is the institution-specific one.
 
 ## No dedicated career fields
 

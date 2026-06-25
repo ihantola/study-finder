@@ -61,13 +61,27 @@ The External API wraps classified values as **koodi objects**:
 `osaamistavoitteet` and `kuvaus` exist on **both** koulutus and toteutus; the
 toteutus value is the institution-specific one.
 
-## No dedicated career fields
+## Career info: a lisatiedot section, not a top-level field
 
-There is **no** `uramahdollisuudet` (career opportunities), `tyollistyminen`
-(employment) or `jatkoopintomahdollisuudet` (further study) field anywhere in
-the konfo-backend API — confirmed against the Swagger spec and a sample of 20
-programmes / 217 implementations. The "Uramahdollisuudet" sections visible on
-the opintopolku.fi website are not exposed as structured fields. The career
-signal therefore comes from `ammattinimikkeet` (job titles) + `asiasanat`
-(keywords) + `osaamisalat` (specialisations) + `osaamistavoitteet` (learning
-goals), and occasionally from free text in `lisatiedot` / `kuvaus`.
+There is **no** top-level `uramahdollisuudet` (career opportunities),
+`tyollistyminen` (employment) or `jatkoopintomahdollisuudet` (further study)
+key in the konfo-backend API. The "Uramahdollisuudet" sections visible on the
+opintopolku.fi website **are** exposed, but as koodisto-coded entries inside the
+generic `metadata.opetus.lisatiedot` list — each item is
+`{otsikko: {koodiUri, nimi}, teksti: {fi,sv,en}}`, where the heading is a value
+from the `koulutuksenlisatiedot` koodisto:
+
+| koodiUri | heading (fi) |
+|---|---|
+| `koulutuksenlisatiedot_04#1` | Uramahdollisuudet |
+| `koulutuksenlisatiedot_02#1` | Jatko-opintomahdollisuudet |
+| `koulutuksenlisatiedot_09#1` | Koulutuksen antama pätevyys |
+
+(The full set of 12 headings lives in `study_finder/normalize.py`.) So career
+text is addressable by `otsikko.koodiUri`, but it is optional — only ~37 % of
+toteutukset include the Uramahdollisuudet section. `normalize.py` pads the
+missing ones with an empty `teksti` so every saved file carries all headings.
+
+Beyond that section, the career signal also comes from `ammattinimikkeet` (job
+titles) + `asiasanat` (keywords) + `osaamisalat` (specialisations) +
+`osaamistavoitteet` (learning goals), and from free text in `kuvaus`.

@@ -2,8 +2,10 @@
 
 How the program works and how the functions call each other. Each module has one
 job; data flows **search/fetch koulutus (api) → cache (client) → pull out
-embedded toteutukset → write one raw JSON file per toteutus (cli)**. There is no
-normalization step — the saved JSON is the raw API response.
+embedded toteutukset → pad to a fixed schema (normalize) → write one JSON file
+per toteutus (cli)**. The saved JSON is the raw API response, padded only so
+every file shares the same top-level keys and `opetus.lisatiedot` section
+headings (empty where the API omitted them); present values are never altered.
 
 ```mermaid
 flowchart TD

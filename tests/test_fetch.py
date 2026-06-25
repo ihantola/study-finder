@@ -11,6 +11,7 @@ from study_finder import api
 from study_finder.cli import _format_duration, main
 from study_finder.client import KonfoClient
 from study_finder.config import DEFAULT_CONFIG, Config
+from study_finder.normalize import LISATIEDOT_HEADINGS, TOTEUTUS_TOP_LEVEL_KEYS, normalize_toteutus
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -139,3 +140,52 @@ def test_cli_404_returns_exit_code_1(tmp_path):
     responses.add(responses.GET, f"{DEFAULT_CONFIG.base_url}/external/koulutus/{oid}", status=404)
     rc = main(["--oid", oid, "--out-dir", str(tmp_path / "out"), "--no-cache"])
     assert rc == 1
+
+
+# -- fixed-schema padding (normalize) ------------------------------------
+def test_normalize_pads_missing_top_level_keys_and_lisatiedot_headings():
+    obj = normalize_toteutus({"oid": "1.2.246.562.17.x", "metadata": {}})
+
+    # every template top-level key is present; absent ones are None (empty)
+    assert set(TOTEUTUS_TOP_LEVEL_KEYS) <= set(obj)
+    assert obj["oid"] == "1.2.246.562.17.x"  # present value untouched
+    assert obj["tarjoajat"] is None  # padded empty
+
+    # all koodisto headings present under metadata.opetus.lisatiedot, in order
+    lis = obj["metadata"]["opetus"]["lisatiedot"]
+    uris = [item["otsikko"]["koodiUri"] for item in lis]
+    assert uris == list(LISATIEDOT_HEADINGS)
+    ura = next(i for i in lis if i["otsikko"]["koodiUri"] == "koulutuksenlisatiedot_04#1")
+    assert ura["otsikko"]["nimi"]["fi"] == "Uramahdollisuudet"
+    assert ura["teksti"] == {"fi": "", "sv": "", "en": ""}  # empty when API omits it
+
+
+def test_normalize_preserves_present_lisatiedot_and_unknown_headings():
+    present = {"otsikko": {"koodiUri": "koulutuksenlisatiedot_04#1", "nimi": {"fi": "Uramahdollisuudet"}}, "teksti": {"fi": "<p>Hyvät näkymät</p>"}}
+    unknown = {"otsikko": {"koodiUri": "koulutuksenlisatiedot_99#1"}, "teksti": {"fi": "x"}}
+    obj = normalize_toteutus({"oid": "o", "metadata": {"opetus": {"lisatiedot": [present, unknown]}}})
+
+    lis = obj["metadata"]["opetus"]["lisatiedot"]
+    # existing career text is kept verbatim, slotted into the template position
+    ura = next(i for i in lis if i["otsikko"]["koodiUri"] == "koulutuksenlisatiedot_04#1")
+    assert ura["teksti"]["fi"] == "<p>Hyvät näkymät</p>"
+    # an unknown heading is never dropped — it lands after the template headings
+    assert lis[len(LISATIEDOT_HEADINGS)] is unknown
+
+
+@responses.activate
+def test_cli_written_file_has_fixed_schema(tmp_path):
+    toteutus_oid = "1.2.246.562.17.00000000000000003821"
+    responses.add(
+        responses.GET,
+        f"{DEFAULT_CONFIG.base_url}/external/toteutus/{toteutus_oid}",
+        json={"oid": toteutus_oid, "metadata": {"kuvaus": {"fi": "x"}}},
+        status=200,
+    )
+    out_dir = tmp_path / "toteutukset"
+    main(["--oid", toteutus_oid, "--out-dir", str(out_dir), "--no-cache"])
+
+    obj = json.loads((out_dir / f"{toteutus_oid}.json").read_text(encoding="utf-8"))
+    assert set(TOTEUTUS_TOP_LEVEL_KEYS) <= set(obj)
+    headings = [i["otsikko"]["koodiUri"] for i in obj["metadata"]["opetus"]["lisatiedot"]]
+    assert "koulutuksenlisatiedot_04#1" in headings  # Uramahdollisuudet always present

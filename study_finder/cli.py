@@ -2,7 +2,10 @@
 
 Downloads raw **toteutus** (implementation) JSON from opintopolku.fi
 (konfo-backend External API) and writes one file per toteutus into an output
-directory. There is no normalization — the raw API responses are the product.
+directory. The saved JSON is the raw API response, padded only to a fixed
+schema (see ``normalize.py``): every file gets the same top-level keys and the
+same ``opetus.lisatiedot`` section headings, empty where the API omitted them.
+Present values are never altered.
 
 A koulutus (programme) is only used to discover its toteutukset; the koulutus
 object itself is not saved.
@@ -37,6 +40,7 @@ import requests
 from . import api
 from .client import KonfoClient
 from .config import ICT_KOULUTUSALA
+from .normalize import normalize_toteutus
 
 
 def _format_duration(seconds: float) -> str:
@@ -101,10 +105,16 @@ def _toteutukset_for_koulutukset(client: KonfoClient, koulutus_oids: list[str]) 
 
 
 def _write_toteutukset(objects: list[dict], out_dir: Path) -> int:
-    """Write each toteutus to ``out_dir/<oid>.json``. Returns the count written."""
+    """Write each toteutus to ``out_dir/<oid>.json``. Returns the count written.
+
+    Each object is padded to the fixed schema (``normalize_toteutus``) so every
+    file has the same top-level keys and the same lisatiedot section headings,
+    empty where the API supplied nothing.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     written = 0
     for obj in objects:
+        obj = normalize_toteutus(obj)
         oid = obj.get("oid")
         if not oid:
             continue

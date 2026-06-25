@@ -6,10 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A CLI tool that downloads CS/ICT **toteutukset** (implementations) from Finland's
 opintopolku.fi via its open `konfo-backend` API and saves the **raw JSON**, one
-file per toteutus, for later analysis. There is intentionally no normalization
-layer — the raw API responses are the product. A koulutus (programme) is fetched
-to discover its toteutukset and is embedded into each saved toteutus under a
-`koulutus` key (so degree-level info like `koulutusala` is preserved).
+file per toteutus, for later analysis. The saved JSON is the raw API response,
+padded only to a **fixed schema** (`normalize.py`): every file gets the same
+top-level keys and the same `opetus.lisatiedot` section headings (e.g.
+"Uramahdollisuudet"), empty where the API omitted them — present values are
+never altered. A koulutus (programme) is fetched to discover its toteutukset and
+is embedded into each saved toteutus under a `koulutus` key (so degree-level
+info like `koulutusala` is preserved).
 
 ## Commands
 
@@ -60,10 +63,18 @@ write one raw JSON file per toteutus (cli)**.
   parent's own `toteutukset` stripped), prints an upfront estimate + live ETA,
   and writes one `<oid>.json` per toteutus to `--out-dir` (default
   `data/toteutukset/`). Turns API/404 errors into a clean message + exit code 1.
+- `normalize.py` — `normalize_toteutus()`, applied at write time only (the
+  `data/raw/` cache stays genuinely raw). Pads each toteutus to a fixed template
+  — `TOTEUTUS_TOP_LEVEL_KEYS` (observed key union) and `LISATIEDOT_HEADINGS`
+  (the full koodisto of `opetus.lisatiedot` section headings) — so every file
+  has the same keys/headings in the same order, empty where the API omitted
+  them. It only *adds* missing keys/headings and reorders; it never overwrites
+  or drops API data (unknown keys/headings are kept). Extend the constants if
+  the API grows a new field/heading.
 
-There is deliberately **no** extraction/normalization module — the saved JSON is
-the raw API response. If you need a flattened/CSV view, build it as a separate
-downstream step over the saved JSON rather than re-adding a pipeline here.
+The padding is intentionally minimal — it does not flatten, decode koodi
+objects, or build a CSV view. If you need that, build it as a separate
+downstream step over the saved JSON rather than expanding this module.
 
 ### Data model
 
@@ -80,8 +91,12 @@ Notable fields under `metadata`: `osaamistavoitteet` (learning goals), `kuvaus`,
 `ammattinimikkeet` (job titles), `asiasanat`, `osaamisalat`, `opetus` (teaching),
 `tutkintonimike`, `koulutusala`, `lisatiedot`. Classified values are **koodi
 objects** (`{"koodiUri", "nimi": {fi,sv,en}}`); free text is `{fi,sv,en}` with
-HTML; term lists are `[{"kieli","arvo"}]`. There is **no** `uramahdollisuudet` /
-`tyollistyminen` / `jatko-opinnot` field — those website sections aren't exposed.
+HTML; term lists are `[{"kieli","arvo"}]`. There is **no** top-level
+`uramahdollisuudet` / `tyollistyminen` / `jatko-opinnot` field — those website
+sections live inside `opetus.lisatiedot` as koodisto-coded `{otsikko, teksti}`
+items (e.g. `koulutuksenlisatiedot_04#1` = "Uramahdollisuudet"). They're
+optional per toteutus; `normalize.py` pads the full heading set on every saved
+file (see [`docs/field-map.md`](docs/field-map.md)).
 
 ### API specifics
 

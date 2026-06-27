@@ -1,5 +1,7 @@
 # study-finder: cached raw API responses and generated output
 data/
+# generated analysis artifacts (reports, coding sheets, pivots)
+analysis/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
